@@ -18,8 +18,10 @@
 
 package org.example;
 
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.serialization.SimpleStringSchema;
 import org.apache.flink.api.common.state.ListState;
 import org.apache.flink.api.common.state.ListStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeHint;
@@ -27,6 +29,8 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.connector.kafka.source.KafkaSource;
+import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
@@ -37,12 +41,26 @@ public class StreamingJob {
 
 	public static void main(String[] args) throws Exception {
 		ParameterTool params = ParameterTool.fromArgs(args);
-		String sourceTextPath = params.getRequired("sourceTextPath");
+		String sourceTextPath = params.get("sourceTextPath");
+		String kafkaBrokers = params.get("kafkaBrokers");
+		String kafkaTopics = params.get("kafkaTopics");
+		String kafkaGroupId = params.get("kafkaGroupId");
+
 		// set up the streaming execution environment
 		final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-
-		DataStream<String> text = env.readTextFile(sourceTextPath);
-
+		DataStream<String> text;
+		if (kafkaBrokers != null) {
+			KafkaSource<String> source = KafkaSource.<String>builder()
+    		.setBootstrapServers(kafkaBrokers)
+    		.setTopics(kafkaTopics)
+    		.setGroupId(kafkaGroupId)
+    		.setStartingOffsets(OffsetsInitializer.earliest())
+    		.setValueOnlyDeserializer(new SimpleStringSchema())
+    		.build();
+			text = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source");
+		} else {
+			text = env.readTextFile(sourceTextPath);
+		}
 		// split up the lines in pairs (2-tuples) containing: (key,value)
 		text.map(new Tokenizer())
 				.keyBy(value -> value.f0)
