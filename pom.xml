@@ -35,6 +35,7 @@ under the License.
 		<maven.compiler.source>${target.java.version}</maven.compiler.source>
 		<maven.compiler.target>${target.java.version}</maven.compiler.target>
 		<log4j.version>2.17.0</log4j.version>
+		<avro.version>1.10.0</avro.version>
 	</properties>
 
 	<repositories>
@@ -49,6 +50,10 @@ under the License.
 				<enabled>true</enabled>
 			</snapshots>
 		</repository>
+		<repository>
+			<id>confluent</id>
+			<url>http://packages.confluent.io/maven/</url>
+		</repository>		
 	</repositories>
 
 	<dependencies>
@@ -89,6 +94,26 @@ under the License.
 		</dependency>
 		<!-- Add connector dependencies here. They must be in the default scope (compile). -->
 
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-avro-confluent-registry</artifactId>
+			<version>${flink.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.flink</groupId>
+			<artifactId>flink-avro</artifactId>
+			<version>${flink.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.apache.avro</groupId>
+			<artifactId>avro</artifactId>
+			<version>${avro.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-avro-serializer</artifactId>
+			<version>5.5.2</version>
+		</dependency>		
 		<!-- Example:
 
 		<dependency>
@@ -122,6 +147,44 @@ under the License.
 
 	<build>
 		<plugins>
+			<!-- https://avro.apache.org/docs/current/gettingstartedjava.html#Creating+Users -->
+			<plugin>
+				<groupId>org.apache.avro</groupId>
+				<artifactId>avro-maven-plugin</artifactId>
+				<version>${avro.version}</version>
+				<configuration>
+					<sourceDirectory>${project.basedir}/src/main/avro/</sourceDirectory>
+					<outputDirectory>${project.basedir}/src/main/java/</outputDirectory>
+					<stringType>String</stringType>
+				</configuration>
+
+				<executions>
+					<execution>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>schema</goal>
+						</goals>
+						<configuration>
+							<sourceDirectory>${project.basedir}/src/main/avro/</sourceDirectory>
+							<outputDirectory>${project.basedir}/src/main/java/</outputDirectory>
+				
+							<includes>
+								<include>*.avsc</include>
+							</includes>				
+							<stringType>String</stringType>
+						</configuration>				
+
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<configuration>
+					<source>1.8</source>
+					<target>1.8</target>
+				</configuration>
+			</plugin>	
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-dependency-plugin</artifactId>

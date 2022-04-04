@@ -18,6 +18,7 @@
 
 package org.example;
 
+import org.apache.avro.generic.GenericRecord;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
@@ -31,9 +32,11 @@ import org.apache.flink.api.java.utils.ParameterTool;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.connector.kafka.source.KafkaSource;
 import org.apache.flink.connector.kafka.source.enumerator.initializer.OffsetsInitializer;
+import org.apache.flink.formats.avro.registry.confluent.ConfluentRegistryAvroDeserializationSchema;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
+import be.uclouvain.gepiciad.avro.StateAnalysis;
 /**
  * Simple Streaming job to demonstrate the impact of a dataset size on the resource utilization
  */
@@ -45,27 +48,37 @@ public class StreamingJob {
 		String kafkaBrokers = params.get("kafkaBrokers");
 		String kafkaTopics = params.get("kafkaTopics");
 		String kafkaGroupId = params.get("kafkaGroupId");
+		String schemaRegistry = params.get("schemaRegistry");
 
 		// set up the streaming execution environment
 		final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-		DataStream<String> text;
+		
 		if (kafkaBrokers != null) {
-			KafkaSource<String> source = KafkaSource.<String>builder()
+			DataStream<StateAnalysis> text;
+			KafkaSource<StateAnalysis> source = KafkaSource.<StateAnalysis>builder()
     		.setBootstrapServers(kafkaBrokers)
     		.setTopics(kafkaTopics)
     		.setGroupId(kafkaGroupId)
     		.setStartingOffsets(OffsetsInitializer.earliest())
-    		.setValueOnlyDeserializer(new SimpleStringSchema())
+			.setValueOnlyDeserializer(ConfluentRegistryAvroDeserializationSchema.forSpecific(StateAnalysis.class, schemaRegistry))
+			
     		.build();
 			text = env.fromSource(source, WatermarkStrategy.noWatermarks(), "Kafka Source");
+			text.map(new StateAnalysisTokenizer())
+				.keyBy(value -> value.f0)
+				.map(new Stater());
 		} else {
+			DataStream<String> text;
 			text = env.readTextFile(sourceTextPath);
-		}
-		// split up the lines in pairs (2-tuples) containing: (key,value)
-		text.map(new Tokenizer())
+			text.map(new Tokenizer())
 				.keyBy(value -> value.f0)
 				.map(new Stater());
 
+		}
+		
+		// split up the lines in pairs (2-tuples) containing: (key,value)
+		
+		
 		env.execute("Flink Streaming Java API Skeleton");
 	}
 
@@ -86,6 +99,15 @@ public class StreamingJob {
 			return new Tuple2<>(tokens[0], tokens[1]);
 		}
 	}
+
+	public static final class StateAnalysisTokenizer implements MapFunction<StateAnalysis, Tuple2<String, String>> {
+
+		@Override
+		public Tuple2<String, String> map(StateAnalysis value) {
+			return new Tuple2<>(value.getKey(), value.getValue());
+		}
+	}
+
 
 	/**
 	 * Dummy user-defined FlatMapFunction that stores a Keyed-Stream in state as a list

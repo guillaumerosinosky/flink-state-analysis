@@ -1,0 +1,17 @@
+{
+   "type":"record",
+   "name":"StateAnalysis",
+   "namespace":"be.uclouvain.gepiciad.avro",
+   "fields":[
+      {
+         "name":"key",
+         "type":"string"
+      },
+      {
+         "name":"value",
+         "type":"string"
+      }
+   ],
+   "connect.version":1,
+   "connect.name":"stateAnalysis"
+}
