@@ -1,0 +1,64 @@
+{{ if .Values.flink.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "flink-state-analysis.fullname" . }}-my-job-submitter
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      initContainers:
+{{- if .Values.source.enabled }}
+        - name: wait-for-flink-sql
+          image: groundnuty/k8s-wait-for:0.1
+          args: [ "job", "-lapp.kubernetes.io/name={{ include "flink-state-analysis.name" . }}-load-data" ]          
+{{- end }}
+        - name: jar-downloader
+          image: "minio/mc"
+          command:
+            [
+              "/bin/bash",
+              "-c",
+              "echo 'mc config host add minio http://{{ .Values.source.host }} {{ .Values.source.user }} {{ .Values.source.password }}';
+              mc config host add minio http://{{ .Values.source.host }} {{ .Values.source.user }} {{ .Values.source.password }}; 
+              echo 'mc cp minio/{{ .Values.source.bucket }}/{{ .Values.source.baseDir }}/{{ .Values.flink.jarName }} /cache/{{ .Values.flink.jarName }}';
+              mc cp minio/{{ .Values.source.bucket }}/{{ .Values.source.baseDir }}/{{ .Values.flink.jarName }} /cache/{{ .Values.flink.jarName }}",
+            ]
+          volumeMounts:
+            - mountPath: /cache
+              name: cache-volume
+
+      containers:
+      - name: submitter
+        image: "{{ .Values.flink.image.repository }}:{{ .Values.flink.image.tag }}" # parametrize
+        volumeMounts:
+          - mountPath: /cache
+            name: cache-volume
+
+        args:
+        - /opt/flink/bin/flink
+        - run
+        - -m
+        - state-analysis-jobmanager:8081 # parametrize
+        - -p
+        - "{{ .Values.flink.parallelism }}"
+        - -c
+        - org.example.StreamingJob
+        - /cache/{{ .Values.flink.jarName }}
+        - -sourceTextPath
+        - s3://{{ include "flink-state-analysis.sourceTablePath" . }}
+{{- if .Values.kafka.enabled }}
+        - -kafkaBrokers
+        - {{ .Values.kafka.brokers }}
+        - -kafkaTopics
+        - {{ .Values.kafka.topics }}
+        - -kafkaGroupId
+        - {{ .Values.kafka.groupId }}
+        - -schemaRegistry
+        - {{ .Values.kafka.schemaRegistry }}
+{{- end }}
+      restartPolicy: Never
+      volumes:
+        - name: cache-volume
+          emptyDir: {}
+{{- end }}

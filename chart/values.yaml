@@ -1,0 +1,47 @@
+workload:
+  keys: 10
+  keyMatching: 0.75
+  datasetSize: 1
+  dataDir: "/app/state-analysis/tables/" #useless
+
+
+source: 
+  enabled: true
+  host: minio.manager:9000
+  bucket: workloads
+  user: root
+  password: rootroot
+  baseDir: state-analysis    
+
+connect:
+  enabled: true
+  policyRegexp: ^table\_.*\.dat$
+  resetConnector: true
+  #path:  #default path set to flink-state-analysis.sourceTablePath
+
+kafka:
+  enabled: true
+  brokers: my-cluster-kafka-bootstrap.kafka:9092
+  topics: my-topic
+  groupId: flink    
+  schemaRegistry: http://my-cluster-schema-registry-cp-schema-registry.kafka:8081
+
+flink:
+  enabled: true
+  host: state-jobmanager
+  port: 8081
+
+  parallelism: 1
+  
+  jarName: StateAnalysis.jar
+    
+  build: 
+    enabled: true
+    codeRepository: https://github.com/guillaumerosinosky/flink-state-analysis.git
+    localDirectory: /app/state-analysis
+
+  image:
+    repository: flink
+    pullPolicy: IfNotPresent
+    # Overrides the image tag whose default is the chart appVersion.
+    tag: 1.14.2

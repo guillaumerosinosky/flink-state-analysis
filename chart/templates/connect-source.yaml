@@ -1,0 +1,61 @@
+{{- if .Values.connect.enabled }}
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaConnector
+metadata:
+  name: my-source-connector
+  namespace: kafka
+  labels:
+    # The strimzi.io/cluster label identifies the KafkaConnect instance
+    # in which to create this connector. That KafkaConnect instance
+    # must have the strimzi.io/use-connector-resources annotation
+    # set to true.
+    strimzi.io/cluster: my-cluster-connect
+spec:
+  class: com.github.mmolimar.kafka.connect.fs.FsSourceConnector
+  tasksMax: 2
+  config:
+    topic: "{{ .Values.kafka.topics }}"
+    #https://github.com/minio/minio/issues/2965#issuecomment-254303881
+    policy.fs.fs.s3a.endpoint: "http://{{ .Values.source.host }}"
+    policy.fs.fs.s3a.access.key: "{{ .Values.source.user }}"
+    policy.fs.fs.s3a.secret.key: "{{ .Values.source.password }}"
+    policy.fs.fs.s3a.path.style.access: true
+    {{ if .Values.connect.path}}
+    fs.uris: "{{ .Values.connect.path }}"
+    {{- else -}}
+    fs.uris: s3a://{{ include "flink-state-analysis.sourceTablePath" . }}
+    {{- end}}
+    policy.class: com.github.mmolimar.kafka.connect.fs.policy.SimplePolicy
+    policy.regexp: {{ .Values.connect.policyRegexp }}
+    #file_reader.class: com.github.mmolimar.kafka.connect.fs.file.reader.TextFileReader
+
+    file_reader.class: com.github.mmolimar.kafka.connect.fs.file.reader.CsvFileReader
+    file_reader.delimited.settings.format.delimiter: "|"
+    file_reader.delimited.settings.schema: string,string
+    file_reader.delimited.settings.header_names: key,value
+    key.converter: org.apache.kafka.connect.storage.StringConverter
+    #value.converter: org.apache.kafka.connect.storage.StringConverter
+    #transforms: ValueToKey,ExtractKey,FlattenValue
+    #transforms.ValueToKey.type: org.apache.kafka.connect.transforms.ValueToKey
+    #transforms.ValueToKey.fields: key
+    #transforms.ExtractKey.type: org.apache.kafka.connect.transforms.ExtractField$Key
+    #transforms.ExtractKey.field: key  
+    #transforms.FlattenValue.type: org.apache.kafka.connect.transforms.Flatten$Value
+    #transforms.FlattenValue.delimiter: ","
+
+    ### Avro
+    value.converter: io.confluent.connect.avro.AvroConverter
+    value.converter.schema.registry.url: http://my-cluster-schema-registry-cp-schema-registry:8081 
+
+    ## Transforms
+    transforms: SetSchemaMetadata,ValueToKey,extractInt
+    # set schema name
+    transforms.SetSchemaMetadata.type: org.apache.kafka.connect.transforms.SetSchemaMetadata$Value
+    transforms.SetSchemaMetadata.schema.name: be.uclouvain.gepiciad.avro.StateAnalysis
+    transforms.SetSchemaMetadata.schema.version: 1  
+    # set key
+    transforms.ValueToKey.type: org.apache.kafka.connect.transforms.ValueToKey
+    transforms.ValueToKey.fields: key
+    transforms.extractInt.type: org.apache.kafka.connect.transforms.ExtractField$Key
+    transforms.extractInt.field: key    
+{{- end }}    
