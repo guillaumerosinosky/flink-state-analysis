@@ -1,7 +1,7 @@
 workload:
   keys: 10
   keyMatching: 0.75
-  datasetSize: 1
+  datasetSize: 1024
   dataDir: "/app/state-analysis/tables/" #useless
   load: true
 
