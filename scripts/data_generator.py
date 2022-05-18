@@ -30,7 +30,7 @@ def main():
         elif o in ("-m", "--key_matching"):
             key_matching = float(a)
         elif o in ("-s", "--size"):
-            dataset_size = int(a)
+            dataset_size = float(a)
         elif o in ("-r", "--row_size"):
             row_size = int(a)
         else:
@@ -43,9 +43,8 @@ def main():
 
     open(data_dir + "table_1.dat", "w").write(''.join(table_row.format(i, 'A'*10) for i in range(keys)))
     with open(data_dir + "table_2.dat", "w") as fd:
-        for i in range(dataset_size):
-            print("Writing {}/{}Gb".format(i+1, dataset_size))
-            fd.write(''.join(table_row.format(randint(0, int(keys / key_matching)), 'B'*(row_size)) for j in range(int(rows_per_table / dataset_size))))
+        #print("Writing {}/{}Gb".format(i+1, dataset_size))
+        fd.write(''.join(table_row.format(randint(0, int(keys / key_matching)), 'B'*(row_size)) for j in range(int(rows_per_table / dataset_size))))
 
 if __name__ == "__main__":
     main()

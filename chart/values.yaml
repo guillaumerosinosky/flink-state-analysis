@@ -3,7 +3,7 @@ workload:
   keyMatching: 0.75
   datasetSize: 1
   dataDir: "/app/state-analysis/tables/" #useless
-
+  load: true
 
 source: 
   enabled: true

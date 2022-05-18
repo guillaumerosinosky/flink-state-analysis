@@ -39,7 +39,7 @@ spec:
         - /opt/flink/bin/flink
         - run
         - -m
-        - state-analysis-jobmanager:8081 # parametrize
+        - {{ .Values.flink.host }}:{{ .Values.flink.port }}
         - -p
         - "{{ .Values.flink.parallelism }}"
         - -c

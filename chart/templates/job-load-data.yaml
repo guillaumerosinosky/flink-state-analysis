@@ -35,6 +35,7 @@ spec:
           command: ["sh"]
           args: ["-c", "cd {{ .Values.flink.build.localDirectory }} ; mvn clean package"]
 {{ end }}
+{{ if .Values.workload.load }}     
         - name: retrieve-data
           image: python:3.9.10
           volumeMounts:
@@ -49,12 +50,15 @@ spec:
               value: "{{ .Values.workload.keyMatching }}"
             - name: DATASET_SIZE
               value: "{{ .Values.workload.datasetSize }}"
+            - name: ROW_SIZE
+              value: "{{ .Values.workload.rowSize }}"
           command: ["bash"]
           args:
             [
               "-c",
-              "cd /app/state-analysis/scripts ; python3 data_generator.py --data_dir=$DATA_DIRECTORY --keys=$SQL_KEYS --key_matching=$KEY_MATCHING --size=$DATASET_SIZE",
+              "cd /app/state-analysis/scripts ; python3 data_generator.py --data_dir=$DATA_DIRECTORY --keys=$SQL_KEYS --key_matching=$KEY_MATCHING --size=$DATASET_SIZE --row-size=$ROW_SIZE",
             ]
+{{ end }}
       containers: # sync data
         - name: load-data
           image: "minio/mc"
@@ -71,7 +75,11 @@ spec:
 {{ if .Values.flink.build.enabled }}
               mc cp {{ .Values.flink.build.localDirectory }}/target/{{ .Values.flink.jarName }} minio/{{ .Values.source.bucket }}/{{ .Values.source.baseDir }}/{{ .Values.flink.jarName }}  || true; 
 {{ end }}
-              mc cp --recursive {{ .Values.workload.dataDir }} minio/{{ include "flink-state-analysis.sourceTablePath" . }}",
+
+{{ if .Values.workload.load }}   
+              mc cp --recursive {{ .Values.workload.dataDir }} minio/{{ include "flink-state-analysis.sourceTablePath" . }};
+{{ end }}              
+              ",
             ]
       volumes:
         - name: git-volume
